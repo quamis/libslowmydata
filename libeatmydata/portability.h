@@ -23,11 +23,4 @@
 
 #include "config.h"
 
-/*
- * Mac OS X 10.7 doesn't declare fdatasync().
- */
-#if defined(HAVE_FDATASYNC) && HAVE_DECL_FDATASYNC == 0
-int fdatasync(int fd);
-#endif
-
 #endif

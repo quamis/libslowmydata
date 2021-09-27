@@ -69,16 +69,6 @@ static TLS libc_open_t libc_open= NULL;
 #ifdef HAVE_OPEN64
 static TLS libc_open64_t libc_open64= NULL;
 #endif
-static TLS libc_fsync_t libc_fsync= NULL;
-static TLS libc_sync_t libc_sync= NULL;
-static TLS libc_fdatasync_t libc_fdatasync= NULL;
-static TLS libc_msync_t libc_msync= NULL;
-#ifdef HAVE_SYNC_FILE_RANGE
-static TLS libc_sync_file_range_t libc_sync_file_range= NULL;
-#endif
-#if defined(F_FULLFSYNC) && defined(__APPLE__)
-static TLS libc_fcntl_t libc_fcntl= NULL;
-#endif
 
 #define ASSIGN_DLSYM_OR_DIE(name)			\
         libc_##name = (libc_##name##_##t)(intptr_t)dlsym(RTLD_NEXT, #name);			\
@@ -96,7 +86,7 @@ static TLS libc_fcntl_t libc_fcntl= NULL;
 
 #pragma weak pthread_testcancel
 
-float LIBSLOWMYDATA_ON_OPEN_SLEEP = 0.0;
+float LIBSLOWMYDATA_ON_OPEN_SLEEP = 0.25;
 char* LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH = "*.*";
 
 /**
@@ -130,8 +120,8 @@ void __attribute__ ((constructor)) eatmydata_init(void)
 	init_running--;
 	init_complete++;
 
-	LIBSLOWMYDATA_ON_OPEN_SLEEP = atof(getenv("LIBSLOWMYDATA_ON_OPEN_SLEEP"));
-	LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH = getenv("LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH");
+	LIBSLOWMYDATA_ON_OPEN_SLEEP = (getenv("LIBSLOWMYDATA_ON_OPEN_SLEEP")?atof(getenv("LIBSLOWMYDATA_ON_OPEN_SLEEP")):LIBSLOWMYDATA_ON_OPEN_SLEEP);
+	LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH = (getenv("LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH")?getenv("LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH"):LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH);
 }
 
 int LIBEATMYDATA_API open(const char* pathname, int flags, ...)
@@ -158,7 +148,7 @@ int LIBEATMYDATA_API open(const char* pathname, int flags, ...)
 		eatmydata_init();
 
 	if (fnmatch(LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH, pathname, 0)==0) {
-		printf("\n-> open(%s), [%s->%f]", pathname, LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH, LIBSLOWMYDATA_ON_OPEN_SLEEP);
+		// printf("\n-> open(%s), [%s->%f]", pathname, LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH, LIBSLOWMYDATA_ON_OPEN_SLEEP);
 		mssleep(LIBSLOWMYDATA_ON_OPEN_SLEEP*1000);
 	}
 
@@ -195,6 +185,14 @@ int LIBEATMYDATA_API open64(const char* pathname, int flags, ...)
 	if (init_running > 0) {
 		errno = EFAULT;
 		return -1;
+	}
+
+	if(!init_complete)
+		eatmydata_init();
+
+	if (fnmatch(LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH, pathname, 0)==0) {
+		// printf("\n-> open(%s), [%s->%f]", pathname, LIBSLOWMYDATA_ON_OPEN_SLEEP_IF_FNMATCH, LIBSLOWMYDATA_ON_OPEN_SLEEP);
+		mssleep(LIBSLOWMYDATA_ON_OPEN_SLEEP*1000);
 	}
 
 	return (*libc_open64)(pathname,flags,mode);
